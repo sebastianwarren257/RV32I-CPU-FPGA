@@ -5,7 +5,8 @@ module dmem(
     input wire [31:0] wri_data,
     output reg [31:0] read_data,
     input wire Memread, Memwrite, 
-    output reg [31:0] tohost
+    output reg [31:0] tohost,
+    input reg [31:0] cycle_count
 );
     reg [31:0] memory [16383:0];//not byte addressable 
     reg [31:0] read_buffer;
@@ -89,7 +90,11 @@ module dmem(
 
     always_ff @(posedge Clk) begin 
         if(Memread) begin
-            read_buffer <= memory[addr[15:2]];
+            if(addr == 32'h80001004) begin
+                read_buffer <= cycle_count;
+            end else begin
+                read_buffer <= memory[addr[15:2]];
+            end
         end
     end
 

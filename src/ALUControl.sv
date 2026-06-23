@@ -3,8 +3,10 @@ module ALUControl(
     input wire [2:0] ALUOp,
     input wire [2:0] funct3,
     input wire [6:0] funct7,
-    output reg [3:0] ALUCtrl
+    output reg [3:0] ALUCtrl,
+    output wire is_muldiv
 );
+    assign is_muldiv = (ALUOp == 3'b010) && (funct7 == 7'b0000001);
     always @(*) begin 
         case (ALUOp)
             3'b000: ALUCtrl = `ADD;//loads/stores

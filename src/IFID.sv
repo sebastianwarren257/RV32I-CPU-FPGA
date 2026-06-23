@@ -8,7 +8,9 @@ module IFID(
     output reg [31:0] instruction2,
     output reg [31:0] pc2,
     output reg [31:0] pc2Plus4,
-    input stall
+    input stall,
+    input div_stall,
+    input MEM_Memread
 );
     always_ff @(posedge Clk) begin
         if(reset || IFID_flush) begin
@@ -16,7 +18,7 @@ module IFID(
             pc2 <= 32'b0;
             pc2Plus4 <= 32'b0;
         end
-        else if(stall)begin //holds values for stall
+        else if(stall || div_stall || MEM_Memread)begin //holds values for stall
             instruction2<=instruction2;
             pc2<=pc2;
             pc2Plus4<=pc2Plus4;

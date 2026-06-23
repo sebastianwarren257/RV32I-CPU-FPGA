@@ -10,6 +10,7 @@
 `define INST_OP_FENCE  7'b0001111
 `define INST_OP_ECALL  7'b1110011
 
+
 `define ADD   4'b0000  // ALU control table
 `define SUB   4'b0001
 `define AND   4'b0010

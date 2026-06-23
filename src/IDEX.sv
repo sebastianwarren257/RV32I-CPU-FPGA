@@ -26,7 +26,10 @@ module IDEX(
     output reg [4:0] rs1_out,
     input [4:0] rs2_in,
     output reg [4:0] rs2_out,
-    input stall
+    input stall,
+    input div_busy,
+    input div_stall,
+    input MEM_Memread
 );
     always_ff @(posedge Clk) begin
             if(reset) begin
@@ -50,6 +53,50 @@ module IDEX(
                 funct3_3 <= 3'b0;
                 rs1_out <=5'b0;
                 rs2_out <=5'b0;
+            end
+            else if (div_busy || div_stall) begin
+                pc3Plus4 <= pc3Plus4;
+                pc3 <= pc3;
+                rA3 <= rA3;
+                rB3 <= rB3;
+                RegWrite_out <= RegWrite_out;
+                Memread_out <= Memread_out;
+                Memwrite_out <= Memwrite_out;
+                MemToReg_out <= MemToReg_out;
+                ALUsrcB3 <= ALUsrcB3;
+                ALUsrcA3 <= ALUsrcA3;
+                Branch3 <= Branch3;
+                Jalr3 <= Jalr3;
+                Jump3 <= Jump3;
+                ALUOp3 <= ALUOp3;
+                imm32_3 <= imm32_3;
+                rWR_out <= rWR_out;
+                funct7_3 <= funct7_3;
+                funct3_3 <= funct3_3;
+                rs1_out <= rs1_out;
+                rs2_out <= rs2_out;
+            end
+            else if (MEM_Memread) begin
+                pc3Plus4 <= pc3Plus4;
+                pc3 <= pc3;
+                rA3 <= rA3;
+                rB3 <= rB3;
+                RegWrite_out <= RegWrite_out;
+                Memread_out <= Memread_out;
+                Memwrite_out <= Memwrite_out;
+                MemToReg_out <= MemToReg_out;
+                ALUsrcB3 <= ALUsrcB3;
+                ALUsrcA3 <= ALUsrcA3;
+                Branch3 <= Branch3;
+                Jalr3 <= Jalr3;
+                Jump3 <= Jump3;
+                ALUOp3 <= ALUOp3;
+                imm32_3 <= imm32_3;
+                rWR_out <= rWR_out;
+                funct7_3 <= funct7_3;
+                funct3_3 <= funct3_3;
+                rs1_out <= rs1_out;
+                rs2_out <= rs2_out;
             end
             else if(IDEX_flush||stall) begin
                 pc3Plus4 <= pc2Plus4;

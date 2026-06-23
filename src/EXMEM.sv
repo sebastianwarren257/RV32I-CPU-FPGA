@@ -19,7 +19,8 @@ module EXMEM(
     output reg [4:0] rWR_out,
     input [4:0] rs1_in, rs2_in,
     output reg [4:0] rs1_out, rs2_out,
-    input stall
+    input stall,
+    input div_stall
 );
     always_ff @(posedge Clk) begin
             if(reset) begin
@@ -36,7 +37,7 @@ module EXMEM(
                 rs1_out <= 5'b0;
                 rs2_out <= 5'b0;
             end
-            else if(stall) begin
+            else if(stall || div_stall) begin
                 ALUResult4 <= ALUResult4;
                 nextPC_out <= nextPC_out;
                 pc4Plus4 <= pc4Plus4;

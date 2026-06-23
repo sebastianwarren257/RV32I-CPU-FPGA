@@ -8,7 +8,8 @@ module HazardDetection(
     output reg [31:0] forwardedA,
     output reg [31:0] forwardedB,
     output reg [31:0] forwarded_store_data,
-    input [31:0] EXMEM_ALUResult, EXMEM_rB, MemToRegOut, EX_rA, EX_rB, MEM_rB
+    input [31:0] EXMEM_ALUResult, EXMEM_rB, MemToRegOut, EX_rA, EX_rB, MEM_rB,
+    input div_stall
 );
     always_comb begin
         //control hazards (Jump/branch flush)
@@ -54,8 +55,9 @@ module HazardDetection(
         end
         if(MEM_Memread) begin
             stall = 1'b1;
-            MEMWB_flush = 1'b1;
-        end   
-
+        end 
+        if(div_stall) begin
+            stall = 1'b1;
+        end  
     end
 endmodule

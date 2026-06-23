@@ -55,8 +55,13 @@ module PipelinedProc(
     reg EX_RegWrite,EX_Memread,EX_MemWrite,EX_ALUsrcB,EX_Branch,EX_Jalr,EX_Jump,EX_ALUsrcA;
     //Alu connections
     wire[31:0] EX_ALUResult;
+    wire[31:0] EX_MULResult;
+    wire[31:0] remainder;
+    wire[31:0] quotient;
+    wire is_muldiv, div_done;
     wire zero;
     wire[3:0] ALUCtrl;
+    wire div_busy;
     //ALU inputs
     reg[31:0] EX_rA,EX_rB;
     reg[4:0] EX_rs2;
@@ -96,6 +101,16 @@ module PipelinedProc(
     reg[31:0] WB_currentPC;
     
 
+    //Cycle Counter
+    reg [31:0] cycle_count;
+    always_ff @(posedge Clk) begin
+        if(reset)
+            cycle_count <= 32'b0;
+        else
+            cycle_count <= cycle_count + 1;
+    end
+    
+
     //Stage 1 Logic
     always_ff @(posedge Clk) begin
         if(reset) 
@@ -116,7 +131,9 @@ module PipelinedProc(
         .instruction(IF_instruction),
         .Clk(Clk)
     );
-    
+    wire is_div    = is_muldiv && EX_funct3[2];
+    wire div_stall = div_busy || div_done || div_start;
+    //(((is_div && !div_busy) || div_busy) && !div_done) || div_done;
     //IFID pipeline wiring
     IFID pipeline1(
         .Clk(Clk),
@@ -128,7 +145,9 @@ module PipelinedProc(
         .instruction2(ID_instruction),
         .pc2(ID_currentPC),
         .pc2Plus4(ID_currentPCPlus4),
-        .stall(stall)
+        .stall(stall),
+        .div_stall(div_stall),
+        .MEM_Memread(MEM_Memread)
     );
 
     //Stage 2 Logic
@@ -195,7 +214,8 @@ module PipelinedProc(
         .EX_rB(EX_rB),
         .MEM_rB(MEM_rB),
         .MEM_Memread(MEM_Memread),
-        .MEMWB_flush(MEMWB_flush)
+        .MEMWB_flush(MEMWB_flush),
+        .div_stall(div_stall)
     );
     //IDEX pipeline
     IDEX pipeline2(
@@ -242,7 +262,10 @@ module PipelinedProc(
         .rs1_out(EX_rs1),
         .rs2_in(ID_rs2),
         .rs2_out(EX_rs2),
-        .stall(stall)
+        .stall(stall),
+        .div_busy(div_busy),
+        .div_stall(div_stall),
+        .MEM_Memread(MEM_Memread)
     );
 
     //stage 3 logic
@@ -250,15 +273,42 @@ module PipelinedProc(
         .ALUOp(EX_ALUOp),
         .funct3(EX_funct3),
         .funct7(EX_funct7),
-        .ALUCtrl(ALUCtrl)
+        .ALUCtrl(ALUCtrl),
+        .is_muldiv(is_muldiv)
     );
-    ALU alu(
+    ALU alu( //consider adding is_muldiv to save power
         .A(EX_ALUsrcA ? EX_currentPC : forwardedA),
         .B(EX_ALUsrcB ? EX_imm32 : forwardedB),
         .ALUCtrl(ALUCtrl),
         .ALUResult(EX_ALUResult),
         .zero(zero)
     );
+    MulUnit MulUnit(
+        .A(forwardedA),
+        .B(forwardedB),
+        .funct3(EX_funct3),
+        .mul_result(EX_MULResult)
+    );
+
+    wire is_signed_div = ~EX_funct3[0];
+    wire is_rem    = EX_funct3[1];
+    reg is_div_d;
+    always_ff @(posedge Clk) is_div_d <= is_div;
+    wire div_start = is_div && !is_div_d;   // pulses once when the divide enters EX
+    DivUnit DivUnit(
+        .Clk(Clk),
+        .reset(reset),
+        .start(div_start),
+        .dividend(forwardedA),
+        .divisor(forwardedB),
+        .is_signed(is_signed_div),
+        .quotient(quotient),
+        .remainder(remainder),
+        .div_busy(div_busy),
+        .div_done(div_done)
+    );
+    wire [31:0] EX_DivResult;
+    assign EX_DivResult = is_rem ? remainder : quotient;
     //redirect logic
     always @(*) begin
         case (EX_funct3)
@@ -288,12 +338,13 @@ module PipelinedProc(
             redirect_valid = 0;
         end
     end
-
+    wire[31:0] EX_Result;
+    assign EX_Result = is_muldiv ? (is_div? EX_DivResult : EX_MULResult) : EX_ALUResult;
     //EXMEM pipeline 
     EXMEM pipeline3(
         .Clk(Clk),
         .reset(reset),
-        .ALUResult3(EX_ALUResult),
+        .ALUResult3(EX_Result),
         .ALUResult4(MEM_ALUResult),
         .nextPC_in(EX_currentPC),
         .nextPC_out(MEM_currentPC),
@@ -317,7 +368,8 @@ module PipelinedProc(
         .rs2_in(EX_rs2),
         .rs1_out(MEM_rs1),
         .rs2_out(MEM_rs2),
-        .stall(MEM_Memread)
+        .stall(MEM_Memread),
+        .div_stall(div_stall)
     );
 
     //stage 4 logic
@@ -329,7 +381,8 @@ module PipelinedProc(
         .read_data(MEM_memOut),
         .Memread(MEM_Memread),
         .Memwrite(MEM_MemWrite),
-        .tohost(tohost)
+        .tohost(tohost),
+        .cycle_count(cycle_count)
     );
 
     //MEMWB pipeline

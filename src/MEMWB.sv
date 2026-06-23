@@ -15,7 +15,8 @@ module MEMWB(
     output reg [4:0] rWR5,
     input [31:0] pc4,
     output reg [31:0] pc5,
-    input MEMWB_flush
+    input MEMWB_flush,
+    input MEM_Memread
 );
     always_ff @(posedge Clk) begin
             if(reset||MEMWB_flush) begin
@@ -26,6 +27,15 @@ module MEMWB(
                 rWR5 <= 5'b0;
                 pc5Plus4 <= 32'b0;
                 pc5<=32'b0;
+            end
+            else if(MEM_Memread) begin
+                ALUResult5 <= ALUResult5;
+                readData5  <= readData5;
+                RegWrite5  <= RegWrite5;
+                MemToReg5  <= MemToReg5;
+                rWR5       <= rWR5;
+                pc5Plus4   <= pc5Plus4;
+                pc5        <= pc5;
             end
             else begin
                 ALUResult5 <= ALUResult4;
