@@ -63,3 +63,6 @@ Each instruction category was verified on hardware using custom RISC-V assembly 
 5. Run synthesis, implementation, and generate bitstream
 6. Program the Basys 3 via Vivado Hardware Manager
 7. Press the center button (reset) and observe the LEDs
+
+## Current Issues
+1. Back to back loads not working properly
