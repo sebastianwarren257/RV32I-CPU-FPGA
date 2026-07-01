@@ -48,6 +48,7 @@ module ALUControl(
                 endcase
             end
             3'b100: ALUCtrl = `PASS_B;
+            default: ALUCtrl = `ADD; 
         endcase
     end
 endmodule

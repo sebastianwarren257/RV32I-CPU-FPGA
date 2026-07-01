@@ -19,7 +19,7 @@ module ImmGen(
                 imm32 = {ins[31:12],12'b0};
             end
             `J_type: begin
-                imm32 = {{(32-11){ins[31]}},ins[31],ins[19:12],ins[20],ins[30:21],1'b0};
+                imm32 = {{(32-21){ins[31]}},ins[31],ins[19:12],ins[20],ins[30:21],1'b0};
             end
             default: begin
                 imm32 = 32'b0;

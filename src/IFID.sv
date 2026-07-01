@@ -10,10 +10,13 @@ module IFID(
     output reg [31:0] pc2Plus4,
     input stall,
     input div_stall,
-    input MEM_Memread
+    input MEM_Memread,
+    input redirect_valid
 );
+    reg redirect_valid_d;
+    always_ff @(posedge Clk) redirect_valid_d <= redirect_valid;
     always_ff @(posedge Clk) begin
-        if(reset || IFID_flush) begin
+        if(reset || IFID_flush || redirect_valid_d) begin
             instruction2 <= 32'b0;
             pc2 <= 32'b0;
             pc2Plus4 <= 32'b0;

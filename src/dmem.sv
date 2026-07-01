@@ -14,7 +14,7 @@ module dmem(
     //initial tohost = 32'b0;
     
     initial begin //intializes dmem with values from hex file
-    $readmemh("C:/Users/Sebastian Warren/RISCV_CPU/fpga_test.dmem.hex", memory);
+    $readmemh("C:/Users/Sebastian Warren/RISCV_CPU/coremark_dmem_25000.hex", memory);
     end
     always_comb begin
         write_enable = 4'b0000;

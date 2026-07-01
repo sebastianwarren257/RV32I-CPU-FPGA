@@ -20,10 +20,11 @@ module EXMEM(
     input [4:0] rs1_in, rs2_in,
     output reg [4:0] rs1_out, rs2_out,
     input stall,
-    input div_stall
+    input div_stall,
+    input EXMEM_flush
 );
     always_ff @(posedge Clk) begin
-            if(reset) begin
+            if(reset || EXMEM_flush) begin
                 ALUResult4 <= 32'b0;
                 nextPC_out <= 32'b0;
                 pc4Plus4 <= 32'b0;

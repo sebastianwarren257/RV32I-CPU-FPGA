@@ -1,6 +1,6 @@
 module HazardDetection(
     input redirect_valid,
-    output reg IFID_flush, IDEX_flush, MEMWB_flush,
+    output reg IFID_flush, IDEX_flush, MEMWB_flush, EXMEM_flush,
     output reg stall,
     input [4:0] IDEX_rs1,IDEX_rs2,EXMEM_rs2,IFID_rs1,IFID_rs2, MEM_rs1, //values in decode to check if we need to forward // look into cases where rs2 not used or immediate
     input [4:0] EXMEM_rD,MEMWB_rD,IDEX_rD, //values to match to decode value
@@ -14,15 +14,19 @@ module HazardDetection(
     always_comb begin
         //control hazards (Jump/branch flush)
         stall = 1'b0;
+        forwarded_store_data = MEM_rB;
         if(redirect_valid) begin
             IFID_flush = 1'b1;
             IDEX_flush = 1'b1;
-            MEMWB_flush = 1'b1;
+            //MEMWB_flush = 1'b1;
+            //EXMEM_flush = 1'b1;
         end
         else begin
             IFID_flush = 1'b0;
             IDEX_flush = 1'b0;
             MEMWB_flush = 1'b0;
+            EXMEM_flush = 1'b0;
+            
         end
         if((IDEX_rs1==EXMEM_rD && EXMEM_RegWrite==1 && EXMEM_rD!=5'b0)) begin //MEM to EX forwarding
             forwardedA = EXMEM_ALUResult;

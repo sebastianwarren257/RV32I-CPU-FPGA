@@ -7,7 +7,7 @@ module imem(
     wire [13:0] bram_addr = (PC - 32'h80000000) >> 2; // combinational translation
     
     initial begin
-        $readmemh("C:/Users/Sebastian Warren/RISCV_CPU/cycle_count_alt.hex",imem); //load instructions into memory
+        $readmemh("C:/Users/Sebastian Warren/RISCV_CPU/coremark_imem_25000.hex",imem); //load instructions into memory
     end
     
     always_ff @(posedge Clk) begin

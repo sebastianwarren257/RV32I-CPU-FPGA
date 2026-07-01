@@ -11,8 +11,9 @@ module PipelinedProc(
     logic [31:0] MemToRegOut;
     wire [31:0] tohost;
     assign LED = tohost[15:0];
+
     //hazard control signals
-    reg IFID_flush,IDEX_flush,MEMWB_flush;
+    reg IFID_flush,IDEX_flush,MEMWB_flush,EXMEM_flush;
     reg stall;
     reg [31:0] forwardedA, forwardedB, forwarded_store_data; // wire these values in
 
@@ -52,7 +53,8 @@ module PipelinedProc(
     reg [31:0] EX_currentPC;
     reg[31:0] EX_currentPCPlus4;
     reg [1:0] EX_MemToReg;
-    reg EX_RegWrite,EX_Memread,EX_MemWrite,EX_ALUsrcB,EX_Branch,EX_Jalr,EX_Jump,EX_ALUsrcA;
+    reg EX_RegWrite,EX_Memread,EX_MemWrite,EX_ALUsrcB,EX_ALUsrcA;
+    reg EX_Branch,EX_Jalr,EX_Jump;
     //Alu connections
     wire[31:0] EX_ALUResult;
     wire[31:0] EX_MULResult;
@@ -100,11 +102,23 @@ module PipelinedProc(
     reg[31:0] WB_currentPCPlus4;
     reg[31:0] WB_currentPC;
     
+    wire cpu_clk;
+    wire clk_locked;
+    wire cpu_reset = reset | ~clk_locked;
+    
+    
+    clk_wiz_0 clkgen (
+        .clk_in1 (Clk),         // 100 MHz from W5
+        .clk_out1(cpu_clk),     // 50 MHz to the CPU
+        .reset   (1'b0),        
+        .locked  (clk_locked)
+    );
+    
 
     //Cycle Counter
     reg [31:0] cycle_count;
-    always_ff @(posedge Clk) begin
-        if(reset)
+    always_ff @(posedge cpu_clk) begin
+        if(cpu_reset)
             cycle_count <= 32'b0;
         else
             cycle_count <= cycle_count + 1;
@@ -112,8 +126,8 @@ module PipelinedProc(
     
 
     //Stage 1 Logic
-    always_ff @(posedge Clk) begin
-        if(reset) 
+    always_ff @(posedge cpu_clk) begin
+        if(cpu_reset) 
             IF_currentPC <=  startPC;
         else 
             IF_currentPC <=  nextPC;
@@ -129,15 +143,15 @@ module PipelinedProc(
     imem InstructionMemory(
         .PC(stall ? IF_currentPC - 32'h4 : IF_currentPC),
         .instruction(IF_instruction),
-        .Clk(Clk)
+        .Clk(cpu_clk)
     );
     wire is_div    = is_muldiv && EX_funct3[2];
     wire div_stall = div_busy || div_done || div_start;
     //(((is_div && !div_busy) || div_busy) && !div_done) || div_done;
     //IFID pipeline wiring
     IFID pipeline1(
-        .Clk(Clk),
-        .reset(reset),
+        .Clk(cpu_clk),
+        .reset(cpu_reset),
         .IFID_flush(IFID_flush),
         .instruction1(IF_instruction),
         .pc1(IF_currentPC-32'h4),
@@ -147,7 +161,8 @@ module PipelinedProc(
         .pc2Plus4(ID_currentPCPlus4),
         .stall(stall),
         .div_stall(div_stall),
-        .MEM_Memread(MEM_Memread)
+        .MEM_Memread(MEM_Memread),
+        .redirect_valid(redirect_valid)
     );
 
     //Stage 2 Logic
@@ -184,7 +199,7 @@ module PipelinedProc(
         .rBi(ID_rs2),
         .rDi(WB_rD),
         .WriE(WB_RegWrite),
-        .Clk(Clk)
+        .Clk(cpu_clk)
     );
     HazardDetection Hazard(
         .redirect_valid(redirect_valid),
@@ -215,12 +230,13 @@ module PipelinedProc(
         .MEM_rB(MEM_rB),
         .MEM_Memread(MEM_Memread),
         .MEMWB_flush(MEMWB_flush),
-        .div_stall(div_stall)
+        .div_stall(div_stall),
+        .EXMEM_flush(EXMEM_flush)
     );
     //IDEX pipeline
     IDEX pipeline2(
-        .Clk(Clk),
-        .reset(reset),
+        .Clk(cpu_clk),
+        .reset(cpu_reset),
         .IDEX_flush(IDEX_flush),
         .pc2Plus4(ID_currentPCPlus4),
         .pc3Plus4(EX_currentPCPlus4),
@@ -293,11 +309,11 @@ module PipelinedProc(
     wire is_signed_div = ~EX_funct3[0];
     wire is_rem    = EX_funct3[1];
     reg is_div_d;
-    always_ff @(posedge Clk) is_div_d <= is_div;
+    always_ff @(posedge cpu_clk) is_div_d <= is_div;
     wire div_start = is_div && !is_div_d;   // pulses once when the divide enters EX
     DivUnit DivUnit(
-        .Clk(Clk),
-        .reset(reset),
+        .Clk(cpu_clk),
+        .reset(cpu_reset),
         .start(div_start),
         .dividend(forwardedA),
         .divisor(forwardedB),
@@ -322,6 +338,8 @@ module PipelinedProc(
         endcase
     end
     always_comb begin 
+        redirect_target = 32'b0;     // default - no latch
+        redirect_valid  = 1'b0;      // default
         if(EX_Jalr) begin
             redirect_target = (forwardedA + EX_imm32) & ~32'd1;
             redirect_valid = 1;
@@ -342,8 +360,8 @@ module PipelinedProc(
     assign EX_Result = is_muldiv ? (is_div? EX_DivResult : EX_MULResult) : EX_ALUResult;
     //EXMEM pipeline 
     EXMEM pipeline3(
-        .Clk(Clk),
-        .reset(reset),
+        .Clk(cpu_clk),
+        .reset(cpu_reset),
         .ALUResult3(EX_Result),
         .ALUResult4(MEM_ALUResult),
         .nextPC_in(EX_currentPC),
@@ -369,12 +387,13 @@ module PipelinedProc(
         .rs1_out(MEM_rs1),
         .rs2_out(MEM_rs2),
         .stall(MEM_Memread),
-        .div_stall(div_stall)
+        .div_stall(div_stall),
+        .EXMEM_flush(EXMEM_flush)
     );
 
     //stage 4 logic
     dmem DataMemory(
-        .Clk(Clk),
+        .Clk(cpu_clk),
         .funct3(MEM_funct3),
         .addr(MEM_ALUResult),
         .wri_data(forwarded_store_data),
@@ -384,11 +403,36 @@ module PipelinedProc(
         .tohost(tohost),
         .cycle_count(cycle_count)
     );
+    
+    // CoreMark result capture for ILA observation
+    (* mark_debug = "true" *) reg [31:0] coremark_elapsed;
+    (* mark_debug = "true" *) reg [31:0] coremark_crc; 
+    (* mark_debug = "true" *) reg        coremark_done;
+    
+    always_ff @(posedge cpu_clk) begin
+        if (cpu_reset) begin
+            coremark_elapsed <= 32'b0;
+            coremark_crc <= 32'b0;
+            coremark_done    <= 1'b0;
+        end else begin
+            // Latch elapsed cycle count when CoreMark writes it to 0x80001008
+            if (MEM_MemWrite && (MEM_ALUResult == 32'h80001008)) begin
+                coremark_elapsed <= forwarded_store_data;
+            end
+            if (MEM_MemWrite && (MEM_ALUResult == 32'h8000100C)) begin
+                coremark_crc <= forwarded_store_data;
+            end
+            // Latch done when CoreMark signals completion (tohost = 1)
+            if (tohost == 32'h00000001) begin
+                coremark_done <= 1'b1;
+            end
+        end
+    end
 
     //MEMWB pipeline
     MEMWB pipeline4(
-        .Clk(Clk),
-        .reset(reset),
+        .Clk(cpu_clk),
+        .reset(cpu_reset),
         .readData4(MEM_memOut),
         .readData5(WB_memOut),
         .ALUResult4(MEM_ALUResult),
@@ -403,7 +447,8 @@ module PipelinedProc(
         .pc5Plus4(WB_currentPCPlus4),
         .pc4(MEM_currentPC),
         .pc5(WB_currentPC),
-        .MEMWB_flush(MEMWB_flush)
+        .MEMWB_flush(MEMWB_flush),
+        .MEM_Memread(MEM_Memread)
     );
 
     //stage 5 logic
