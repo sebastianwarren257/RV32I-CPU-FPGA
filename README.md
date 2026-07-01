@@ -82,6 +82,6 @@ Each instruction category was verified on hardware using custom RISC-V assembly 
 
 ## Roadmap
 
-- [ ] CoreMark benchmark port (bare-metal, using the memory-mapped cycle counter)
-- [ ] Fix back-to-back load forwarding hazard
+- [X] CoreMark benchmark port (bare-metal, using the memory-mapped cycle counter)
+- [X] Fix back-to-back load forwarding hazard
 - [ ] RTL-to-GDS-II flow (OpenLane + Sky130 PDK) for physical design portfolio artifacts****
